@@ -29,12 +29,14 @@ if echo '#include <z3.h>' | gcc -H -fsyntax-only -E - 1>/dev/null 2>&1; then
   read -p 'z3 and <z3.h> exist. Reinstall z3 from sources? [y/N] ' -r yn
   case $yn in
     [Yy]* ) installZ3;;
-    * ) exit;;
+    * ) exit 0;;
   esac
 else
   read -p 'GCatch requires z3 WITH SOURCES. Reinstall z3 from sources? [Y/n] ' -r yn
   case $yn in
-    [Nn]* ) exit;;
+    [Nn]* ) exit 0;;
     * ) installZ3;;
   esac
 fi
+
+exit 0
