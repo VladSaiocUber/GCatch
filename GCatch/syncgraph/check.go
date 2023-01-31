@@ -7,62 +7,12 @@ import (
 	"github.com/system-pclub/GCatch/GCatch/config"
 	"github.com/system-pclub/GCatch/GCatch/instinfo"
 	"github.com/system-pclub/GCatch/GCatch/output"
+	"github.com/system-pclub/GCatch/GCatch/util"
 )
 
 type blockingPos struct {
 	pathId  int
 	pNodeId int
-}
-
-// newStopChannel creates a channel that is stopped after a certain time period.
-func newStopChannel() chan struct{} {
-	stop := make(chan struct{})
-
-	go func() {
-		// If no timeout has been established, do not instrument an abort.
-		if config.MAX_GCATCH_FRAGMENT_ANALYSIS_TIME == 0 {
-			return
-		}
-
-		<-time.After(time.Duration(config.MAX_GCATCH_FRAGMENT_ANALYSIS_TIME) * time.Second)
-		close(stop)
-	}()
-
-	return stop
-}
-
-// iterateOrAbort takes an abort channel, a list of items, and a function that operates over individual items
-// and their index. It iterates over every element of the list, and either executes the function or aborts
-// if the stop channel has been closed. It returns true if stopped prematurely, or false if it succesfully
-// iterated over the entire list.
-func iterateOrAbort[T any](stop chan struct{}, ts []T, f func(int, T) bool) bool {
-	for i, t := range ts {
-		select {
-		case <-stop:
-			return true
-		default:
-			if f(i, t) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// iterateOrAbort takes an abort channel and a function that is repeatedly executed until the guard returned
-// is false aborts if the stop channel has been closed. It returns true if stopped prematurely, or false if
-// it all iterations succeed before the timer expires.
-func loopUntilTimeout(stop chan struct{}, f func() bool) bool {
-	for f() {
-		select {
-		case <-stop:
-			return true
-		default:
-		}
-	}
-
-	return false
 }
 
 func (g SyncGraph) CheckWithZ3() bool {
@@ -72,17 +22,17 @@ func (g SyncGraph) CheckWithZ3() bool {
 
 	// Create stop channel
 	timer := time.Now()
-	stop := newStopChannel()
+	stop := util.NewStopper()
 
 	// Main loop: for each pathCombination
-	iterateOrAbort(stop, g.PathCombinations, func(_ int, pathComb *pathCombination) bool {
+	util.IterateUntilTimeout(stop, g.PathCombinations, func(_ int, pathComb *pathCombination) bool {
 		// If the pathCombination satisfies: the MainGoroutine's path is nil, skip this pathCombination
 
 		// Store path's nodes into a slice of PNode. Make sure that each PNode is unique, though PNode.Node may appear multiple times
 		goroutines := []*Goroutine{}
 		paths := []*PPath{}
 
-		iterateOrAbort(stop, pathComb.go_paths, func(_ int, goPath *tupleGoroutinePath) bool {
+		util.IterateUntilTimeout(stop, pathComb.go_paths, func(_ int, goPath *tupleGoroutinePath) bool {
 			goroutines = append(goroutines, goPath.goroutine)
 
 			vecNewPNode := []*PNode{}
@@ -108,8 +58,8 @@ func (g SyncGraph) CheckWithZ3() bool {
 		if config.BoolChSafety {
 			// Check if the program has double close
 			vecClose := []*instinfo.ChClose{}
-			iterateOrAbort(stop, paths, func(_ int, pPath *PPath) bool {
-				iterateOrAbort(stop, pPath.Path, func(i int, pNode *PNode) bool {
+			util.IterateUntilTimeout(stop, paths, func(_ int, pPath *PPath) bool {
+				util.IterateUntilTimeout(stop, pPath.Path, func(i int, pNode *PNode) bool {
 					if syncNode, ok := pNode.Node.(SyncOp); ok {
 						if g.Task.IsPrimATarget(syncNode.Primitive()) {
 							if op, ok := syncNode.(*ChanOp); ok {
@@ -148,8 +98,8 @@ func (g SyncGraph) CheckWithZ3() bool {
 		pathId2AllBlockPos := make(map[int][]blockingPos)
 
 		const emptyPNodeId = -2
-		iterateOrAbort(stop, paths, func(i int, pPath *PPath) bool {
-			iterateOrAbort(stop, pPath.Path, func(j int, pNode *PNode) bool {
+		util.IterateUntilTimeout(stop, paths, func(i int, pPath *PPath) bool {
+			util.IterateUntilTimeout(stop, pPath.Path, func(j int, pNode *PNode) bool {
 				if syncNode, ok := pNode.Node.(SyncOp); ok {
 					if g.Task.IsPrimATarget(syncNode.Primitive()) {
 						if canSyncOpTriggerGl(syncNode) {
@@ -178,7 +128,7 @@ func (g SyncGraph) CheckWithZ3() bool {
 		for _, _ = range pathId2AllBlockPos {
 			vecIndex = append(vecIndex, 0)
 		}
-		loopUntilTimeout(stop, func() bool {
+		stop.LoopUntilTimeout(func() bool {
 			newComb := make(map[int]blockingPos)
 			boolCanSync := false
 			for pathId, indice := range vecIndex {
@@ -251,7 +201,7 @@ func (g SyncGraph) CheckWithZ3() bool {
 		})
 
 		// For every blocking op of target channel on any path
-		return iterateOrAbort(stop, allBlockPosComb, func(i int, blockPosComb map[int]blockingPos) bool {
+		return util.IterateUntilTimeout(stop, allBlockPosComb, func(i int, blockPosComb map[int]blockingPos) bool {
 			for _, blockPos := range blockPosComb {
 				if blockPos.pNodeId != emptyPNodeId {
 					inst := paths[blockPos.pathId].Path[blockPos.pNodeId].Node.Instruction()
@@ -389,7 +339,9 @@ func (g SyncGraph) CheckWithZ3() bool {
 		})
 	})
 
-	fmt.Println("Fragment analysis took", time.Since(timer))
+	if bugFound {
+		fmt.Println("Fragment analysis took:", time.Since(timer))
+	}
 	//fmt.Println("=========Total path sets:",countBlockPoint)
 	//output.Wait_for_input()
 	return bugFound
