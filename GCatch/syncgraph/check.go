@@ -71,6 +71,7 @@ func (g SyncGraph) CheckWithZ3() bool {
 	bugFound := false
 
 	// Create stop channel
+	timer := time.Now()
 	stop := newStopChannel()
 
 	// Main loop: for each pathCombination
@@ -388,6 +389,7 @@ func (g SyncGraph) CheckWithZ3() bool {
 		})
 	})
 
+	fmt.Println("Fragment analysis took", time.Since(timer))
 	//fmt.Println("=========Total path sets:",countBlockPoint)
 	//output.Wait_for_input()
 	return bugFound
