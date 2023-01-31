@@ -2,6 +2,7 @@ package doublelock
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/system-pclub/GCatch/GCatch/config"
 	"github.com/system-pclub/GCatch/GCatch/output"
@@ -230,16 +231,16 @@ func getCallSiteCalleeMapping() {
 	*/
 }
 
-func analyzeFN(fn *ssa.Function, callchain []*callgraph.Edge, context map[*StLockingOp]bool, depth int) {
+func analyzeFN(fn *ssa.Function, callchain []*callgraph.Edge, context map[*StLockingOp]bool, depth int) bool {
 
 	numInspectedFn++
 
 	if numInspectedFn > MaxInspectedFun {
-		return
+		return false
 	}
 
 	if depth > MaxCallChainDepth {
-		return
+		return false
 	}
 
 	vecNameChain := []string{}
@@ -261,7 +262,7 @@ func analyzeFN(fn *ssa.Function, callchain []*callgraph.Edge, context map[*StLoc
 		}
 
 		if len(vecIndex) >= 3 {
-			return
+			return false
 		}
 
 		if len(vecIndex) == 2 {
@@ -269,7 +270,7 @@ func analyzeFN(fn *ssa.Function, callchain []*callgraph.Edge, context map[*StLoc
 				s1 := vecNameChain[vecIndex[0]+1]
 				s2 := vecNameChain[vecIndex[1]+1]
 				if s1 == s2 {
-					return
+					return false
 				}
 			}
 		}
@@ -277,7 +278,10 @@ func analyzeFN(fn *ssa.Function, callchain []*callgraph.Edge, context map[*StLoc
 
 	newbugs := GenKillAnalysis(fn, context)
 
+	var bugFound bool
+
 	for _, bug := range newbugs {
+		bugFound = true
 		reportDoubleLock(bug, callchain)
 	}
 
@@ -347,13 +351,17 @@ func analyzeFN(fn *ssa.Function, callchain []*callgraph.Edge, context map[*StLoc
 
 		for e, contextLock := range mapIIContextLock {
 			callchain = append(callchain, e)
-			analyzeFN(e.Callee.Func, callchain, contextLock, depth+1)
+			bugFound = bugFound || analyzeFN(e.Callee.Func, callchain, contextLock, depth+1)
 			callchain = callchain[:len(callchain)-1]
 		}
 	}
+
+	return bugFound
 }
 
 func analyzeEntryFN(fn *ssa.Function) {
+
+	stopper, timer := util.NewStopper(), time.Now()
 
 	numInspectedFn = 0
 	depth := 0
@@ -362,7 +370,10 @@ func analyzeEntryFN(fn *ssa.Function) {
 
 	newbugs := GenKillAnalysis(fn, contextLock)
 
+	var bugFound bool
+
 	for _, bug := range newbugs {
+		bugFound = true
 		reportDoubleLock(bug, callchain)
 	}
 
@@ -425,9 +436,19 @@ func analyzeEntryFN(fn *ssa.Function) {
 
 		for e, contextLock := range mapIIContextLock {
 			callchain = append(callchain, e)
-			analyzeFN(e.Callee.Func, callchain, contextLock, depth)
+			bugFound = bugFound || analyzeFN(e.Callee.Func, callchain, contextLock, depth)
 			callchain = callchain[:len(callchain)-1]
 		}
+	}
+
+	select {
+	case <-stopper:
+		return
+	default:
+	}
+
+	if bugFound {
+		fmt.Println("Fragment analysis took:", time.Since(timer))
 	}
 }
 
@@ -436,7 +457,6 @@ func Initialize() {
 }
 
 func Detect() {
-
 	MapMutex = make(map[string]*StMutex)
 	VecFNsWithLocking = []*ssa.Function{}
 	AnalyzedFNs = make(map[string]bool)

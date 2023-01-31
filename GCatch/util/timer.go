@@ -44,6 +44,25 @@ func IterateUntilTimeout[T any](stop Stopper, ts []T, f func(int, T) bool) bool 
 	return false
 }
 
+// IterateUntilTimeout takes an abort channel, a list of items, and a function that operates over individual items
+// and their index. It iterates over every element of the list, and either executes the function or aborts
+// if the stop channel has been closed. It returns true if stopped prematurely, or false if it succesfully
+// iterated over the entire list.
+func MapRangeUntilTimeout[T comparable, U any](stop Stopper, ts map[T]U, f func(T, U) bool) bool {
+	for t, u := range ts {
+		select {
+		case <-stop:
+			return true
+		default:
+			if f(t, u) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // LoopUntilTimeout takes a stopper and a function that is repeatedly executed until the guard returned
 // is false, or aborts if when the stopper has been closed. It returns true if stopped prematurely, or false if
 // it all iterations succeed before the timer expires.

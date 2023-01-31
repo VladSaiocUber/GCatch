@@ -3,9 +3,11 @@ package fatal
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/system-pclub/GCatch/GCatch/config"
 	"github.com/system-pclub/GCatch/GCatch/output"
+	"github.com/system-pclub/GCatch/GCatch/util"
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
 )
@@ -41,6 +43,7 @@ func loop_fns() {
 
 fn_loop:
 	for fn, _ := range ssautil.AllFunctions(config.Prog) {
+		stopper, timer := util.NewStopper(), time.Now()
 
 		if fn == nil {
 			continue
@@ -60,11 +63,22 @@ fn_loop:
 		}
 		C8_done_fn = append(C8_done_fn, fn.String())
 
-		inside_func(fn)
+		bugFound := inside_func(fn)
+
+		select {
+		case <-stopper:
+			return
+		default:
+		}
+
+		if bugFound {
+			fmt.Println("Fragment analysis took:", time.Since(timer))
+		}
 	}
 }
 
-func inside_func(fn *ssa.Function) {
+func inside_func(fn *ssa.Function) bool {
+	var bugFound bool
 
 	for _, bb := range fn.Blocks {
 		for _, inst := range bb.Instrs {
@@ -100,7 +114,7 @@ func inside_func(fn *ssa.Function) {
 					if out.Site == inst {
 						if out.Callee.Func != nil {
 							if strings.Contains(out.Callee.Func.String(), fn.Name()) { // make sure the callee is created in this function, or there will be a lot of FPs
-								find_fatal_in_fn(out.Callee.Func, fn)
+								bugFound = bugFound || find_fatal_in_fn(out.Callee.Func, fn)
 							}
 						}
 					}
@@ -110,13 +124,17 @@ func inside_func(fn *ssa.Function) {
 			if interesting_fn == nil {
 				continue
 			} else {
-				find_fatal_in_fn(interesting_fn, fn)
+				bugFound = bugFound || find_fatal_in_fn(interesting_fn, fn)
 			}
 		}
 	}
+
+	return bugFound
 }
 
-func find_fatal_in_fn(target, parent *ssa.Function) {
+func find_fatal_in_fn(target, parent *ssa.Function) bool {
+	var bugFound bool
+
 	for _, bb := range target.Blocks {
 		for _, inst := range bb.Instrs {
 			inst_call, ok := inst.(*ssa.Call)
@@ -138,6 +156,7 @@ func find_fatal_in_fn(target, parent *ssa.Function) {
 				if strings.Contains(callee_fn.Pkg.String(), "package testing") == false {
 					continue
 				}
+				bugFound = true
 				report(inst, parent)
 			}
 
@@ -146,4 +165,6 @@ func find_fatal_in_fn(target, parent *ssa.Function) {
 	for _, anony := range target.AnonFuncs {
 		find_fatal_in_fn(anony, parent)
 	}
+
+	return bugFound
 }

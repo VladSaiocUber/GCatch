@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 	"strings"
+	"time"
 
 	"github.com/system-pclub/GCatch/GCatch/analysis"
 	"github.com/system-pclub/GCatch/GCatch/config"
@@ -514,13 +515,15 @@ func Detect() {
 	Bugs = []ssa.Instruction{}
 	util.GetStructPointerMapping()
 
-	for fn, _ := range ssautil.AllFunctions(config.Prog) {
+	stopper, timer := util.NewStopper(), time.Now()
+
+	if util.MapRangeUntilTimeout(stopper, ssautil.AllFunctions(config.Prog), func(fn *ssa.Function, _ bool) bool {
 		if fn == nil {
-			continue
+			return false
 		}
 
 		if config.IsPathIncluded(fn.String()) == false {
-			continue
+			return false
 		}
 
 		//if fn.String() != "(*github.com/gohugoio/hugo/tpl/tplimpl.templateNamespace).Lookup" {
@@ -528,7 +531,7 @@ func Detect() {
 		//}
 
 		if _, ok := AnalyzedFNs[fn.String()]; ok {
-			continue
+			return false
 		}
 
 		AnalyzedFNs[fn.String()] = true
@@ -538,6 +541,10 @@ func Detect() {
 		} else {
 			inspectFunc(fn, true)
 		}
+
+		return false
+	}) {
+		return
 	}
 
 	//fmt.Print("Analyzed function", len(AnalyzedFNs))
@@ -582,6 +589,7 @@ func Detect() {
 		}
 	}
 
+	var bugFound bool
 	for _, mapIndex := range mapIndexGroup {
 		vecToPrint := []ssa.Instruction{}
 
@@ -597,6 +605,13 @@ func Detect() {
 		fmt.Print("]----------\n\tType: Missing Unlock \tReason: Unlock operation of a Mutex/RWMutex is missing.\n")
 		fmt.Print("\tLocation of multiple buggy instructions:\n")
 		output.PrintInsts(vecToPrint)
+
+		bugFound = true
 	}
 
+	if bugFound {
+		fmt.Println("Fragment analysis took:", time.Since(timer))
+	}
+
+	return
 }
