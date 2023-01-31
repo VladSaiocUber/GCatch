@@ -32,7 +32,8 @@ func main() {
 	}()
 
 	pProjectPath := flag.String("path", "", "Full path of the target project")
-	flag.IntVar(&config.MAX_GCATCH_DDL_SECOND, "timeout", 360000, "Time to run GCatch for")
+	flag.IntVar(&config.MAX_GCATCH_DDL_SECOND, "total-timeout", 360000, "Total time to run GCatch for")
+	flag.IntVar(&config.MAX_GCATCH_FRAGMENT_ANALYSIS_TIME, "timeout", 0, "Time to analyze any path combination found by GCatch for")
 	pRelativePath := flag.String("include", "", "Relative path (what's after /src/) of the target project")
 	pCheckerName := flag.String("checker", "BMOC", "the checker to be used, divided by \":\"")
 	pShowCompileError := flag.Bool("compile-error", false, "If fail to compile a package, show the errors of compilation")
