@@ -222,13 +222,23 @@ func detect(mapCheckerName map[string]bool) {
 
 	config.Inst2Defers, config.Defer2Insts = genKill.ComputeDeferMap()
 
+	checks := make([]string, 0, len(mapCheckerName))
+	for strCheckerName, present := range mapCheckerName {
+		if present {
+			checks = append(checks, strCheckerName)
+		}
+	}
+	fmt.Println("Running the following checks:", strings.Join(checks, "; "))
+
 	boolNeedCallGraph := mapCheckerName["double"] || mapCheckerName["conflict"] || mapCheckerName["structfield"] ||
 		mapCheckerName["fatal"] || mapCheckerName["BMOC"]
 	if boolNeedCallGraph {
+		fmt.Println("Building call graph...")
 		config.CallGraph = BuildCallGraph()
 		if config.CallGraph == nil {
 			return
 		}
+		fmt.Println("Call graph done.")
 	}
 
 	for strCheckerName, _ := range mapCheckerName {
@@ -252,7 +262,7 @@ func detect(mapCheckerName map[string]bool) {
 func BuildCallGraph() *callgraph.Graph {
 	cfg := &pointer.Config{
 		Mains:           ssautil.MainPackages(config.Prog.AllPackages()),
-		Reflection:      config.POINTER_CONSIDER_REFLECTION,
+		Reflection:       config.POINTER_CONSIDER_REFLECTION,
 		BuildCallGraph:  true,
 		Queries:         nil,
 		IndirectQueries: nil,
