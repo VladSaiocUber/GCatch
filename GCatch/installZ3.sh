@@ -18,7 +18,7 @@ installZ3() {
 cd "$(dirname "$(realpath "$0")")" || exit 1
 
 # check z3 bin
-if ! Z3=$(command -v z3); then
+if ! Z3=$(which z3); then
   echo 'Cannot detect z3'
   installZ3
   exit
