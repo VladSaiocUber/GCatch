@@ -2,6 +2,7 @@ package bmoc
 
 import (
 	"fmt"
+	"log"
 	"github.com/system-pclub/GCatch/GCatch/analysis/pointer"
 	"github.com/system-pclub/GCatch/GCatch/config"
 	"github.com/system-pclub/GCatch/GCatch/instinfo"
@@ -18,6 +19,8 @@ func Detect() {
 	vecLocker := pointer.WithdrawAllTraditionals(stPtrResult, vecStOpValue)
 
 	mapDependency := syncgraph.GenDMap(vecChannel, vecLocker)
+
+	log.Printf("Checking %d channels...\n", len(vecChannel))
 
 	for _, ch := range vecChannel {
 		//p := config.Prog.Fset.Position(ch.MakeInst.Pos())
