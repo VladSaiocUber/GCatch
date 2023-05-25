@@ -27,7 +27,7 @@ func NewStopper() Stopper {
 
 // IterateUntilTimeout takes an abort channel, a list of items, and a function that operates over individual items
 // and their index. It iterates over every element of the list, and either executes the function or aborts
-// if the stop channel has been closed. It returns true if stopped prematurely, or false if it succesfully
+// if the stop channel has been closed. It returns true if stopped prematurely, or false if it successfully
 // iterated over the entire list.
 func IterateUntilTimeout[T any](stop Stopper, ts []T, f func(int, T) bool) bool {
 	for i, t := range ts {
@@ -46,7 +46,7 @@ func IterateUntilTimeout[T any](stop Stopper, ts []T, f func(int, T) bool) bool 
 
 // IterateUntilTimeout takes an abort channel, a list of items, and a function that operates over individual items
 // and their index. It iterates over every element of the list, and either executes the function or aborts
-// if the stop channel has been closed. It returns true if stopped prematurely, or false if it succesfully
+// if the stop channel has been closed. It returns true if stopped prematurely, or false if it successfully
 // iterated over the entire list.
 func MapRangeUntilTimeout[T comparable, U any](stop Stopper, ts map[T]U, f func(T, U) bool) bool {
 	for t, u := range ts {
