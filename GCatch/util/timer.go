@@ -25,6 +25,29 @@ func NewStopper() Stopper {
 	return stop
 }
 
+// ExecuteWithinTimeFrame takes a value and a function, and attempts to execute the function on the given
+// value. The function has to be executed within the time frame given by config.MAX_GCATCH_FRAGMENT_ANALYSIS_TIME.
+// The values returned are the result of applying the function on the input, the time it took, and whether
+// the timer expired before completion or not.
+func ExecuteWithinTimeFrame[T, U any](x T, f func(T) U) (U, time.Duration, bool) {
+	done, stop, timer := make(chan U, 1), NewStopper(), time.Now()
+
+	go func() {
+		done <- f(x)
+	}()
+
+	var y U
+	var ok bool
+	select {
+	case y = <-done:
+		ok = true
+	case <-stop:
+		ok = false
+	}
+
+	return y, time.Since(timer), ok
+}
+
 // IterateUntilTimeout takes an abort channel, a list of items, and a function that operates over individual items
 // and their index. It iterates over every element of the list, and either executes the function or aborts
 // if the stop channel has been closed. It returns true if stopped prematurely, or false if it successfully
@@ -65,7 +88,7 @@ func MapRangeUntilTimeout[T comparable, U any](stop Stopper, ts map[T]U, f func(
 
 // LoopUntilTimeout takes a stopper and a function that is repeatedly executed until the guard returned
 // is false, or aborts if when the stopper has been closed. It returns true if stopped prematurely, or false if
-// it all iterations succeed before the timer expires.
+// all iterations succeed before the timer expires.
 func (stop Stopper) LoopUntilTimeout(f func() bool) bool {
 	for f() {
 		select {

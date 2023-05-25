@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/system-pclub/GCatch/GCatch/analysis"
@@ -23,7 +24,8 @@ type stCond struct {
 
 var FNOnlyContainUnlock map[string]string
 var Bugs []ssa.Instruction
-var AnalyzedFNs map[string]bool
+var bugMu = &sync.Mutex{}
+var AnalyzedFNs map[string]struct{}
 
 var numFunction int
 
@@ -39,7 +41,7 @@ func strInsensitiveContains(s, substr string) bool {
 
 func Initialize() {
 	FNOnlyContainUnlock = make(map[string]string)
-	AnalyzedFNs = make(map[string]bool)
+	AnalyzedFNs = make(map[string]struct{})
 	Bugs = []ssa.Instruction{}
 }
 
@@ -419,10 +421,6 @@ func inspectInst(inputInst ssa.Instruction, isBrutal bool, usingSolver bool, pd 
 					util.GetTypeMethods(res.Type(), m, mVisited)
 					mapTypeMethods := util.DecoupleTypeMethods(m)
 
-					//util.PrintTypeMethods(mapTypeMethods)
-					//fmt.Println()
-					//fmt.Println()
-
 					for _, mapMethods := range mapTypeMethods {
 						if _, ok1 := mapMethods["Lock"]; ok1 {
 							if _, ok2 := mapMethods["Unlock"]; ok2 {
@@ -436,9 +434,6 @@ func inspectInst(inputInst ssa.Instruction, isBrutal bool, usingSolver bool, pd 
 							}
 						}
 					}
-
-					//os.Exit(0)
-
 				}
 			}
 
@@ -483,7 +478,9 @@ func inspectFunc1(fn *ssa.Function) {
 					//fmt.Println(ii, ii.Pos(), ii.Pos())
 
 					if !flag {
+						bugMu.Lock()
 						Bugs = append(Bugs, ii)
+						bugMu.Unlock()
 					}
 
 				}
@@ -492,7 +489,7 @@ func inspectFunc1(fn *ssa.Function) {
 	}
 }
 
-func inspectFunc(fn *ssa.Function, isMethod bool) {
+func inspectFunc(fn *ssa.Function) {
 	if fn.Blocks == nil {
 		//meaning this is external function. You will see a lot of them if you use Ssa_build_packages
 		return
@@ -503,70 +500,40 @@ func inspectFunc(fn *ssa.Function, isMethod bool) {
 		return
 	}
 
-	inspectFunc1(fn)
+	counter, stop := 0, util.NewStopper()
+	fns := make([]*ssa.Function, 1+len(fn.AnonFuncs))
+	fns[0] = fn
+	copy(fns[1:], fn.AnonFuncs)
 
-	for _, anonyFN := range fn.AnonFuncs { // loop through all anonymous functions in fn
-		inspectFunc1(anonyFN)
+	if util.IterateUntilTimeout(stop, fns, func(_ int, fn *ssa.Function) bool {
+		counter++
+		inspectFunc1(fn)
+		return false
+	}) {
+		fmt.Printf("Missing Unlock :: Fragment analysis timed out. Checked only [%d/%d] functions.\n", counter, len(fns)-1)
+		return
 	}
 }
 
 func Detect() {
-
 	Bugs = []ssa.Instruction{}
 	util.GetStructPointerMapping()
 
-	stopper, timer := util.NewStopper(), time.Now()
-
-	if util.MapRangeUntilTimeout(stopper, ssautil.AllFunctions(config.Prog), func(fn *ssa.Function, _ bool) bool {
-		if fn == nil {
-			return false
-		}
-
-		if config.IsPathIncluded(fn.String()) == false {
-			return false
-		}
-
-		//if fn.String() != "(*github.com/gohugoio/hugo/tpl/tplimpl.templateNamespace).Lookup" {
-		//	continue
-		//}
-
+	mu := &sync.Mutex{}
+	util.ParallelIntraproceduralAnalysis("Missing Unlock", ssautil.AllFunctions(config.Prog), func (fn *ssa.Function) {
+		mu.Lock()
 		if _, ok := AnalyzedFNs[fn.String()]; ok {
-			return false
+			mu.Unlock()
+			return
 		}
+		AnalyzedFNs[fn.String()] = struct{}{}
+		mu.Unlock()
 
-		AnalyzedFNs[fn.String()] = true
-
-		if fn.Signature.Recv() == nil {
-			inspectFunc(fn, false)
-		} else {
-			inspectFunc(fn, true)
-		}
-
-		return false
-	}) {
-		return
-	}
-
-	//fmt.Print("Analyzed function", len(AnalyzedFNs))
+		inspectFunc(fn)
+	})
 
 	mapCombinedIndex := make(map[int]bool)
 	mapIndexGroup := make(map[int]map[int]bool)
-
-	/*
-		for i, _ := range Bugs {
-			Bugs[i].Parent().WriteTo(os.Stdout)
-		}
-
-
-
-		for i, _ :=  range Bugs {
-			for j:= i + 1; j < len(Bugs); j ++ {
-				fmt.Printf("%p %p %d\n",Bugs[i].Parent(), Bugs[j].Parent(), Bugs[i].Parent() == Bugs[j].Parent())
-			}
-		}
-
-	*/
-
 	for i, _ := range Bugs {
 		if _, ok := mapCombinedIndex[i]; ok {
 			continue
@@ -585,11 +552,9 @@ func Detect() {
 				mapIndexGroup[i][j] = true
 				mapCombinedIndex[j] = true
 			}
-
 		}
 	}
 
-	var bugFound bool
 	for _, mapIndex := range mapIndexGroup {
 		vecToPrint := []ssa.Instruction{}
 
@@ -605,13 +570,5 @@ func Detect() {
 		fmt.Print("]----------\n\tType: Missing Unlock \tReason: Unlock operation of a Mutex/RWMutex is missing.\n")
 		fmt.Print("\tLocation of multiple buggy instructions:\n")
 		output.PrintInsts(vecToPrint)
-
-		bugFound = true
 	}
-
-	if bugFound {
-		fmt.Println("Fragment analysis took:", time.Since(timer))
-	}
-
-	return
 }

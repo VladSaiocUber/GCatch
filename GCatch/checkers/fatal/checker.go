@@ -3,7 +3,7 @@ package fatal
 import (
 	"fmt"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/system-pclub/GCatch/GCatch/config"
 	"github.com/system-pclub/GCatch/GCatch/output"
@@ -12,19 +12,9 @@ import (
 	"golang.org/x/tools/go/ssa/ssautil"
 )
 
-var C8_done_fn []string
-
-func init() {
-	C8_done_fn = []string{}
-}
-
-func cleanup() {
-
-}
+var C8_done_fn = make(map[string]struct{})
 
 func Detect() {
-
-	cleanup()
 	loop_fns()
 }
 
@@ -40,41 +30,22 @@ func report(inst ssa.Instruction, parent *ssa.Function) {
 }
 
 func loop_fns() {
-
-fn_loop:
-	for fn, _ := range ssautil.AllFunctions(config.Prog) {
-		stopper, timer := util.NewStopper(), time.Now()
-
-		if fn == nil {
-			continue
-		}
-		if config.IsPathIncluded(fn.String()) == false {
-			continue
-		}
-		//Actually we don't need to measure the function name, since testing.Fatal() won't be used in normal functions
-		//if strings.Contains(fn.Name(),"test") == false && strings.Contains(fn.Name(),"Test") == false {
-		//	continue
-		//}
-		fn_str := fn.String()
-		for _, done_fn := range C8_done_fn {
-			if done_fn == fn_str {
-				continue fn_loop
-			}
-		}
-		C8_done_fn = append(C8_done_fn, fn.String())
-
-		bugFound := inside_func(fn)
-
-		select {
-		case <-stopper:
+	mu := &sync.Mutex{}
+	util.ParallelIntraproceduralAnalysis("Fatal", ssautil.AllFunctions(config.Prog), func (fn *ssa.Function) {
+		mu.Lock()
+		if _, ok := C8_done_fn[fn.String()]; ok {
+			mu.Unlock()
 			return
-		default:
 		}
+		C8_done_fn[fn.String()] = struct{}{}
+		mu.Unlock()
 
-		if bugFound {
-			fmt.Println("Fragment analysis took:", time.Since(timer))
+		if _, timer, ok := util.ExecuteWithinTimeFrame(fn, inside_func); ok {
+			fmt.Println("Fatal :: Fragment analysis took:", timer)
+		} else {
+			fmt.Println("Fatal :: Fragment analysis timed out.")
 		}
-	}
+	})
 }
 
 func inside_func(fn *ssa.Function) bool {
@@ -159,7 +130,6 @@ func find_fatal_in_fn(target, parent *ssa.Function) bool {
 				bugFound = true
 				report(inst, parent)
 			}
-
 		}
 	}
 	for _, anony := range target.AnonFuncs {

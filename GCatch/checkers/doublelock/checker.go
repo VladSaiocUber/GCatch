@@ -2,7 +2,6 @@ package doublelock
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/system-pclub/GCatch/GCatch/config"
 	"github.com/system-pclub/GCatch/GCatch/output"
@@ -152,17 +151,8 @@ func reportDoubleLock(newbug *StDoubleLock, callchain []*callgraph.Edge) {
 }
 
 func getFunctionWithLockingOps() {
-
 	for fn, _ := range ssautil.AllFunctions(config.Prog) {
-		if fn == nil {
-			continue
-		}
-
-		if config.IsPathIncluded(fn.String()) == false {
-			continue
-		}
-
-		if _, ok := AnalyzedFNs[fn.String()]; ok {
+		if _, ok := AnalyzedFNs[fn.String()]; ok || !util.PathIncluded(fn) {
 			continue
 		}
 
@@ -360,9 +350,6 @@ func analyzeFN(fn *ssa.Function, callchain []*callgraph.Edge, context map[*StLoc
 }
 
 func analyzeEntryFN(fn *ssa.Function) {
-
-	stopper, timer := util.NewStopper(), time.Now()
-
 	numInspectedFn = 0
 	depth := 0
 	callchain := make([]*callgraph.Edge, 0)
@@ -440,16 +427,6 @@ func analyzeEntryFN(fn *ssa.Function) {
 			callchain = callchain[:len(callchain)-1]
 		}
 	}
-
-	select {
-	case <-stopper:
-		return
-	default:
-	}
-
-	if bugFound {
-		fmt.Println("Fragment analysis took:", time.Since(timer))
-	}
 }
 
 func Initialize() {
@@ -465,32 +442,18 @@ func Detect() {
 
 	if config.BoolDisableFnPointer {
 		getCallSiteCalleeMapping()
-
 	}
 
-	//for strKey, _ := range MapMutex {
-	//	fmt.Println(strKey)
-	//}
-
-	/*
-		vecFun := make([] string, 0)
-
-		for _, fn := range VecFNsWithLocking {
-			//analyzeEntryFN(fn)
-			vecFun = append(vecFun, fn.String())
+	for i, fn := range VecFNsWithLocking {
+		i := i
+		fmt.Printf("Double lock detection [%d/%d]\n", i, len(VecFNsWithLocking)-1)
+		if _, timer, ok := util.ExecuteWithinTimeFrame(fn, func (fn *ssa.Function) bool {
+			analyzeEntryFN(fn)
+			return true
+		}); ok {
+			fmt.Println("Double Lock :: Fragment analysis took:", timer)
+		} else {
+			fmt.Println("Double Lock :: Fragment analysis timed out.")
 		}
-
-		fmt.Println(len(vecFun))
-
-		sort.Strings(vecFun)
-
-		for _, s := range vecFun {
-			fmt.Println(s)
-		}
-	*/
-
-	for _, fn := range VecFNsWithLocking {
-		analyzeEntryFN(fn)
 	}
-
 }

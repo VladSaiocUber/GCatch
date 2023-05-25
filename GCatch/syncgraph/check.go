@@ -23,16 +23,21 @@ func (g SyncGraph) CheckWithZ3() bool {
 	// Create stop channel
 	timer := time.Now()
 	stop := util.NewStopper()
+	counter := 0
 
 	// Main loop: for each pathCombination
-	util.IterateUntilTimeout(stop, g.PathCombinations, func(_ int, pathComb *pathCombination) bool {
+	if util.IterateUntilTimeout(stop, g.PathCombinations, func(_ int, pathComb *pathCombination) bool {
+		config.BugIndexMu.Lock()
+		fmt.Printf("Checking path combination [%d/%d]\n", counter, len(g.PathCombinations)-1)
+		counter++
+		config.BugIndexMu.Unlock()
 		// If the pathCombination satisfies: the MainGoroutine's path is nil, skip this pathCombination
 
 		// Store path's nodes into a slice of PNode. Make sure that each PNode is unique, though PNode.Node may appear multiple times
 		goroutines := []*Goroutine{}
 		paths := []*PPath{}
 
-		util.IterateUntilTimeout(stop, pathComb.go_paths, func(_ int, goPath *tupleGoroutinePath) bool {
+		if util.IterateUntilTimeout(stop, pathComb.go_paths, func(_ int, goPath *tupleGoroutinePath) bool {
 			goroutines = append(goroutines, goPath.goroutine)
 
 			vecNewPNode := []*PNode{}
@@ -53,7 +58,9 @@ func (g SyncGraph) CheckWithZ3() bool {
 			}
 			paths = append(paths, newPath)
 			return false
-		})
+		}) {
+			return true
+		}
 
 		if config.BoolChSafety {
 			// Check if the program has double close
@@ -98,8 +105,8 @@ func (g SyncGraph) CheckWithZ3() bool {
 		pathId2AllBlockPos := make(map[int][]blockingPos)
 
 		const emptyPNodeId = -2
-		util.IterateUntilTimeout(stop, paths, func(i int, pPath *PPath) bool {
-			util.IterateUntilTimeout(stop, pPath.Path, func(j int, pNode *PNode) bool {
+		if util.IterateUntilTimeout(stop, paths, func(i int, pPath *PPath) bool {
+			if util.IterateUntilTimeout(stop, pPath.Path, func(j int, pNode *PNode) bool {
 				if syncNode, ok := pNode.Node.(SyncOp); ok {
 					if g.Task.IsPrimATarget(syncNode.Primitive()) {
 						if canSyncOpTriggerGl(syncNode) {
@@ -112,7 +119,9 @@ func (g SyncGraph) CheckWithZ3() bool {
 					}
 				}
 				return false
-			})
+			}) {
+				return true
+			}
 
 			emptyBlockPos := blockingPos{
 				pathId:  i,
@@ -120,7 +129,9 @@ func (g SyncGraph) CheckWithZ3() bool {
 			}
 			pathId2AllBlockPos[i] = append(pathId2AllBlockPos[i], emptyBlockPos)
 			return false
-		})
+		}) {
+			return true
+		}
 
 		allBlockPosComb := []map[int]blockingPos{}
 
@@ -128,7 +139,7 @@ func (g SyncGraph) CheckWithZ3() bool {
 		for _, _ = range pathId2AllBlockPos {
 			vecIndex = append(vecIndex, 0)
 		}
-		stop.LoopUntilTimeout(func() bool {
+		if stop.LoopUntilTimeout(func() bool {
 			newComb := make(map[int]blockingPos)
 			boolCanSync := false
 			for pathId, indice := range vecIndex {
@@ -198,7 +209,9 @@ func (g SyncGraph) CheckWithZ3() bool {
 			}
 
 			return true
-		})
+		}) {
+			return true
+		}
 
 		// For every blocking op of target channel on any path
 		return util.IterateUntilTimeout(stop, allBlockPosComb, func(i int, blockPosComb map[int]blockingPos) bool {
@@ -207,7 +220,7 @@ func (g SyncGraph) CheckWithZ3() bool {
 					inst := paths[blockPos.pathId].Path[blockPos.pNodeId].Node.Instruction()
 					str := output.StringIISrc(inst)
 					if _, printed := PrintedBlockPosStr[str]; printed {
-						return true
+						return false
 					}
 				}
 			}
@@ -331,16 +344,18 @@ func (g SyncGraph) CheckWithZ3() bool {
 				fmt.Println()
 
 				bugFound = true
-				return true
+				return false
 			}
 
 			countBlockPoint++
 			return false
 		})
-	})
-
-	if bugFound {
-		fmt.Println("Fragment analysis took:", time.Since(timer))
+	}) {
+		fmt.Printf("BMOC/Channel Safety :: Fragment analysis timed out. Checked only [%d/%d] path combinations\n", counter, len(g.PathCombinations)-1)
+	} else {
+		if bugFound {
+			fmt.Printf("BMOC/Channel Safety :: Fragment analysis took %s\n", time.Since(timer))
+		}
 	}
 	//fmt.Println("=========Total path sets:",countBlockPoint)
 	//output.Wait_for_input()

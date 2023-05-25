@@ -11,34 +11,38 @@ import (
 	"golang.org/x/tools/go/ssa/ssautil"
 )
 
-var AnalyzedFNs map[string]bool
-var MapMutex map[string]*StMutex
+var (
+	mapReportedPair map[string]struct{}
+	AnalyzedFNs map[string]bool
+	MapMutex map[string]*StMutex
 
-var VecFNsWithLocking []*ssa.Function
+	VecFNsWithLocking []*ssa.Function
 
-var mapIIStLockingOp map[ssa.Instruction]*StLockingOp
-var mapIIStUnlockingOp map[ssa.Instruction]*StUnlockingOp
+	mapIIStLockingOp map[ssa.Instruction]*StLockingOp
+	mapIIStUnlockingOp map[ssa.Instruction]*StUnlockingOp
 
-var mapCallSiteCallee map[ssa.Instruction]map[*ssa.Function]bool
+	mapCallSiteCallee map[ssa.Instruction]map[*ssa.Function]bool
 
-var mapIDCallChain map[int][]*callgraph.Edge
+	mapIDCallChain map[int][]*callgraph.Edge
 
-var numCurrentCallChainID int
+	numCurrentCallChainID int
+	numInspectedFn int
 
-const MaxCallChainDepth int = 6 // Be careful: Algorithm complexity: e^n, n = C5_call_chain_layer
-const MaxInspectedFun int = 100000
+	mapPairIDMutexPair map[string]*stMutexPair
 
-var numInspectedFn int
+	reportedPairs map[string]bool
+)
 
-var mapPairIDMutexPair map[string]*stMutexPair
+const (
+	MaxCallChainDepth int = 6 // Be careful: Algorithm complexity: e^n, n = C5_call_chain_layer
+	MaxInspectedFun int = 100000
+)
 
-var reportedPairs map[string]bool
 
 func printCallChain(callchain []*callgraph.Edge) {
-
 	mapFun := make(map[string]bool)
-	boolRecursive := false
-	containFnPointer := false
+	var boolRecursive, containFnPointer bool
+
 	for index, e := range callchain {
 
 		if pCall, ok := e.Site.(*ssa.Call); ok {
@@ -95,15 +99,7 @@ func printCallChain(callchain []*callgraph.Edge) {
 func getFunctionWithLockingOps() {
 
 	for fn, _ := range ssautil.AllFunctions(config.Prog) {
-		if fn == nil {
-			continue
-		}
-
-		if config.IsPathIncluded(fn.String()) == false {
-			continue
-		}
-
-		if _, ok := AnalyzedFNs[fn.String()]; ok {
+		if _, ok := AnalyzedFNs[fn.String()]; ok || !util.PathIncluded(fn) {
 			continue
 		}
 
@@ -283,13 +279,6 @@ func analyzeFN(fn *ssa.Function, callchain []*callgraph.Edge, context map[*StLoc
 }
 
 func analyzeEntryFN(fn *ssa.Function) {
-
-	//if fn.Name() != "Value" {
-	//	return
-	//}
-
-	//fn.WriteTo(os.Stdout)
-
 	numInspectedFn = 0
 	depth := 0
 	callchain := make([]*callgraph.Edge, 0)
@@ -383,9 +372,6 @@ func Detect() {
 		analyzeEntryFN(fn)
 	}
 
-	//fmt.Println("Whole map:")
-	//fmt.Println(mapPairIDMutexPair)
-
 	for k, _ := range mapPairIDMutexPair {
 		mutexIDs := strings.Split(k, "\t\t")
 		k2 := mutexIDs[1] + "\t\t" + mutexIDs[0]
@@ -399,10 +385,6 @@ func Detect() {
 				mapReportedPair[k] = struct{}{}
 				mapReportedPair[k2] = struct{}{}
 			}
-
 		}
 	}
-
 }
-
-var mapReportedPair map[string]struct{}

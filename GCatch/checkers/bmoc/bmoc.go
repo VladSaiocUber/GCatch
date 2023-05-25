@@ -20,14 +20,17 @@ func Detect() {
 
 	mapDependency := syncgraph.GenDMap(vecChannel, vecLocker)
 
-	log.Printf("Checking %d channels...\n", len(vecChannel))
-
+	okChans := make([]*instinfo.Channel, 0, len(vecChannel))
 	for _, ch := range vecChannel {
-		//p := config.Prog.Fset.Position(ch.MakeInst.Pos())
-		//_ = p
-		if OKToCheck(ch) == true {
-			CheckCh(ch, vecChannel, vecLocker, mapDependency)
+		if OKToCheck(ch) {
+			okChans = append(okChans, ch)
 		}
+	}
+
+	log.Printf("Checking %d channels...\n", len(okChans))
+
+	for _, ch := range okChans {
+		CheckCh(ch, vecChannel, vecLocker, mapDependency)
 	}
 
 }
@@ -47,10 +50,7 @@ func OKToCheck(ch *instinfo.Channel) (boolCheck bool) {
 		return
 	}
 	pkgOfPkg := pkg.Pkg
-	if pkgOfPkg == nil {
-		return
-	}
-	if config.IsPathIncluded(pkgOfPkg.Path()) == false {
+	if pkgOfPkg == nil || !config.IsPathIncluded(pkgOfPkg.Path()) {
 		return
 	}
 

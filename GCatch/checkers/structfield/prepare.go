@@ -29,13 +29,8 @@ func loop_pkg_C3() {
 	vecAllMethods := List_all_methods()
 
 	for _, pkg := range config.Prog.AllPackages() { //loop all packages
-		if pkg == nil {
-			continue
-		}
-
 		//Skip builtin packages, vendor packages. Test functions are automatically skipped. Include packages in "include"
-		if config.IsPathIncluded(pkg.Pkg.Path()) {
-		} else {
+		if pkg == nil || !config.IsPathIncluded(pkg.Pkg.Path()) {
 			continue
 		}
 
@@ -250,11 +245,7 @@ func List_all_struct(prog *ssa.Program) []*MyStruct {
 	all_structs := *new([]*MyStruct)
 
 	for _, pkg := range prog.AllPackages() { //loop all packages
-		if pkg == nil {
-			continue
-		}
-
-		if config.IsPathIncluded(pkg.Pkg.Path()) == false {
+		if pkg == nil || !config.IsPathIncluded(pkg.Pkg.Path()) {
 			continue
 		}
 
@@ -265,7 +256,7 @@ func List_all_struct(prog *ssa.Program) []*MyStruct {
 			if mem_as_type != nil {
 
 				//check if this member is in our interested path
-				if config.IsPathIncluded(mem_as_type.String()) == false {
+				if !config.IsPathIncluded(mem_as_type.String()) {
 					continue
 				}
 
@@ -335,7 +326,7 @@ func List_all_methods() []*ssa.Function {
 			str = fn_in_prog.String()
 
 		} else {
-			if config.IsPathIncluded(fn_in_prog.Pkg.Pkg.Path()) == false {
+			if !config.IsPathIncluded(fn_in_prog.Pkg.Pkg.Path()) {
 				continue
 			}
 			str = fn_in_prog.RelString(fn_in_prog.Pkg.Pkg)
