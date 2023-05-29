@@ -6,7 +6,6 @@ import (
 	"go/types"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/system-pclub/GCatch/GCatch/analysis"
 	"github.com/system-pclub/GCatch/GCatch/config"
