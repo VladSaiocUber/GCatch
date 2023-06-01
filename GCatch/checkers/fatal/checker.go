@@ -43,7 +43,7 @@ func loop_fns() {
 		if _, timer, ok := util.ExecuteWithinTimeFrame(fn, inside_func); ok {
 			fmt.Println("Fatal :: Fragment analysis took:", timer)
 		} else {
-			fmt.Println("Fatal :: Fragment analysis timed out.")
+			fmt.Printf("Fatal :: Fragment analysis timed out in %ds\n", config.MAX_GCATCH_FRAGMENT_ANALYSIS_TIME)
 		}
 	})
 }

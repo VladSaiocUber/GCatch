@@ -509,7 +509,8 @@ func inspectFunc(fn *ssa.Function) {
 		inspectFunc1(fn)
 		return false
 	}) {
-		fmt.Printf("Missing Unlock :: Fragment analysis timed out. Checked only [%d/%d] functions.\n", counter, len(fns)-1)
+		fmt.Printf("Missing Unlock :: Fragment analysis timed out in %ds\n", config.MAX_GCATCH_FRAGMENT_ANALYSIS_TIME)
+		fmt.Printf("Checked only [%d/%d] functions.\n", counter, len(fns)-1)
 		return
 	}
 }

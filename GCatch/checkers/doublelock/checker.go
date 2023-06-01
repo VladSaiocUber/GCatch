@@ -453,7 +453,7 @@ func Detect() {
 		}); ok {
 			fmt.Println("Double Lock :: Fragment analysis took:", timer)
 		} else {
-			fmt.Println("Double Lock :: Fragment analysis timed out.")
+			fmt.Printf("Double Lock :: Fragment analysis timed out in %ds\n", config.MAX_GCATCH_FRAGMENT_ANALYSIS_TIME)
 		}
 	}
 }

@@ -351,7 +351,8 @@ func (g SyncGraph) CheckWithZ3() bool {
 			return false
 		})
 	}) {
-		fmt.Printf("BMOC/Channel Safety :: Fragment analysis timed out. Checked only [%d/%d] path combinations\n", counter, len(g.PathCombinations)-1)
+		fmt.Printf("BMOC/Channel Safety :: Fragment analysis timed out in %ds\n", config.MAX_GCATCH_FRAGMENT_ANALYSIS_TIME)
+		fmt.Printf("Checked only [%d/%d] path combinations\n", counter, len(g.PathCombinations)-1)
 	} else {
 		if bugFound {
 			fmt.Printf("BMOC/Channel Safety :: Fragment analysis took %s\n", time.Since(timer))
