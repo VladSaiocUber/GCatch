@@ -72,7 +72,7 @@ func AnalyzeAllSyncOp() (*pointer.Result, []*instinfo.StOpValue) {
 	metrics := stamets.Analyze(cfg)
 	fmt.Println(metrics)
 	stPtrResult, err := metrics.Unpack()
-	fmt.Println("PTA for channel operations done")
+	defer fmt.Println("PTA for channel operations done")
 
 	if err != nil {
 		fmt.Println("Error when querying all channel values:\n", err.Error())
@@ -81,6 +81,9 @@ func AnalyzeAllSyncOp() (*pointer.Result, []*instinfo.StOpValue) {
 
 	// Update config.Callgraph, and create a map from instruction to all its corresponding out edges in CallGraph
 	config.CallGraph = stPtrResult.CallGraph
+	cgMetrics := stamets.GetCallGraphMetrics(config.CallGraph)
+	fmt.Println("PTA for channel ops call graph metrics")
+	fmt.Println(cgMetrics)
 
 	config.Inst2CallSite = make(map[ssa.CallInstruction]map[*callgraph.Edge]bool)
 	for _, node := range config.CallGraph.Nodes {
