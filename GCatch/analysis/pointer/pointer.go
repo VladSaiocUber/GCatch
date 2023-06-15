@@ -8,6 +8,7 @@ import (
 	"github.com/system-pclub/GCatch/GCatch/config"
 	"github.com/system-pclub/GCatch/GCatch/instinfo"
 	"github.com/system-pclub/GCatch/GCatch/output"
+	"github.com/vladsaiocuber/stamets"
 	"golang.org/x/tools/go/callgraph"
 	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
@@ -66,7 +67,13 @@ func AnalyzeAllSyncOp() (*pointer.Result, []*instinfo.StOpValue) {
 		IndirectQueries: nil,
 		Log:             nil,
 	}
-	stPtrResult, err := pointer.Analyze(cfg)
+
+	fmt.Println("Performing PTA for channel operations...")
+	metrics := stamets.Analyze(cfg)
+	fmt.Println(metrics)
+	stPtrResult, err := metrics.Unpack()
+	fmt.Println("PTA for channel operations done")
+
 	if err != nil {
 		fmt.Println("Error when querying all channel values:\n", err.Error())
 		return nil, nil

@@ -21,6 +21,7 @@ import (
 
 	"github.com/system-pclub/GCatch/GCatch/checkers/forgetunlock"
 	"github.com/system-pclub/GCatch/GCatch/config"
+	"github.com/vladsaiocuber/stamets"
 )
 
 func main() {
@@ -262,13 +263,18 @@ func detect(mapCheckerName map[string]bool) {
 func BuildCallGraph() *callgraph.Graph {
 	cfg := &pointer.Config{
 		Mains:           ssautil.MainPackages(config.Prog.AllPackages()),
-		Reflection:       config.POINTER_CONSIDER_REFLECTION,
+		Reflection:      config.POINTER_CONSIDER_REFLECTION,
 		BuildCallGraph:  true,
 		Queries:         nil,
 		IndirectQueries: nil,
 		Log:             nil,
 	}
-	result, err := pointer.Analyze(cfg)
+
+	fmt.Println("Building call graph with PTA...")
+	metrics := stamets.Analyze(cfg)
+	fmt.Println(metrics)
+	result, err := metrics.Unpack()
+
 	defer func() {
 		cfg = nil
 		result = nil
@@ -277,6 +283,10 @@ func BuildCallGraph() *callgraph.Graph {
 		fmt.Println("Error when building callgraph with nil Queries:\n", err.Error())
 		return nil
 	}
-	graph := result.CallGraph
+	graphMetrics := stamets.GetCallGraphMetrics(result.CallGraph)
+	fmt.Println(graphMetrics)
+
+	graph, _ := graphMetrics.Unpack()
+	fmt.Println("Call graph construction done")
 	return graph
 }
