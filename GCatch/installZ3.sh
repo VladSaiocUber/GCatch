@@ -11,7 +11,7 @@ installZ3() {
   python3 scripts/mk_make.py
   cd build || exit 1
   make
-  sudo make install
+  make install
 }
 
 # cd script directory
