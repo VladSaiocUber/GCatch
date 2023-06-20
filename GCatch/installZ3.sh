@@ -6,8 +6,6 @@
 PREF=$1
 
 installZ3() {
-  echo "Installing z3 to a default position, normally $Z3"
-  echo "Could fail if run without sudo"
   cd ./tools/z3 || exit 1
   if [ -z "${PREF}" ]
   then
@@ -27,6 +25,13 @@ installZ3() {
 
 # cd script directory
 cd "$(dirname "$(realpath "$0")")" || exit 1
+
+if [ ! -z "${PREF}" ]
+then
+  echo "Installing z3 at ${PREF}"
+  installZ3
+  exit
+fi
 
 # check z3 bin
 if ! Z3=$(which z3); then
