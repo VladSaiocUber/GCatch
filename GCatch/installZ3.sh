@@ -3,15 +3,26 @@
 # Install z3 from sources
 # GCatch requires z3 WITH SOURCES
 # You can also checkout https://github.com/Z3Prover/z3 to install Z3
+PREF=$1
 
 installZ3() {
   echo "Installing z3 to a default position, normally $Z3"
   echo "Could fail if run without sudo"
   cd ./tools/z3 || exit 1
-  python3 scripts/mk_make.py
+  if [ -z "${PREF}" ]
+  then
+    python3 scripts/mk_make.py
+  else
+    python3 scripts/mk_make.py --prefix="${PREF}"
+  fi
   cd build || exit 1
   make
-  make install
+  if [ -z "${PREF}" ]
+  then
+    sudo make install
+  else
+    make install
+  fi
 }
 
 # cd script directory
