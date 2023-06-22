@@ -20,6 +20,7 @@ installZ3() {
     sudo make install
   else
     make install
+    chmod u=x "${PREF}/bin/z3"
   fi
 }
 
