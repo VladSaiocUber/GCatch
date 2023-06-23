@@ -31,7 +31,7 @@ func report(inst ssa.Instruction, parent *ssa.Function) {
 
 func loop_fns() {
 	mu := &sync.Mutex{}
-	util.ParallelIntraproceduralAnalysis("Fatal", ssautil.AllFunctions(config.Prog), func (fn *ssa.Function) {
+	util.ParallelIntraproceduralAnalysis("Fatal", ssautil.AllFunctions(config.Prog), func(fn *ssa.Function) {
 		mu.Lock()
 		if _, ok := C8_done_fn[fn.String()]; ok {
 			mu.Unlock()

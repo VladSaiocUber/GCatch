@@ -1,9 +1,9 @@
 package util
 
 import (
+	"github.com/system-pclub/GCatch/GCatch/config"
 	"golang.org/x/exp/slices"
 	"golang.org/x/tools/go/ssa"
-	"github.com/system-pclub/GCatch/GCatch/config"
 
 	"fmt"
 	"runtime"
@@ -41,7 +41,7 @@ func PathIncluded(fn *ssa.Function) bool {
 }
 
 // ParallelIntraproceduralAnalysis
-func ParallelIntraproceduralAnalysis(Checker string, fns map[*ssa.Function]bool, f func (fn *ssa.Function)) {
+func ParallelIntraproceduralAnalysis(Checker string, fns map[*ssa.Function]bool, f func(fn *ssa.Function)) {
 	par, wg := make(chan struct{}, runtime.NumCPU()), &sync.WaitGroup{}
 	okFns := make([]*ssa.Function, 0, len(fns))
 	for fn := range fns {
@@ -49,7 +49,7 @@ func ParallelIntraproceduralAnalysis(Checker string, fns map[*ssa.Function]bool,
 			okFns = append(okFns, fn)
 		}
 	}
-	slices.SortFunc(okFns, func (f1, f2 *ssa.Function) bool {
+	slices.SortFunc(okFns, func(f1, f2 *ssa.Function) bool {
 		return f1.Pos() < f2.Pos()
 	})
 
@@ -72,4 +72,24 @@ func ParallelIntraproceduralAnalysis(Checker string, fns map[*ssa.Function]bool,
 		}(fn)
 	}
 	wg.Wait()
+}
+
+// IntraproceduralAnalysis
+func IntraproceduralAnalysis(Checker string, fns map[*ssa.Function]bool, f func(fn *ssa.Function)) {
+	okFns := make([]*ssa.Function, 0, len(fns))
+	for fn := range fns {
+		if PathIncluded(fn) {
+			okFns = append(okFns, fn)
+		}
+	}
+	slices.SortFunc(okFns, func(f1, f2 *ssa.Function) bool {
+		return f1.Pos() < f2.Pos()
+	})
+
+	counter := 0
+	for _, fn := range okFns {
+		fmt.Printf("%s :: Checking fragment [%d/%d]\n", Checker, counter, len(okFns)-1)
+		counter++
+		f(fn)
+	}
 }

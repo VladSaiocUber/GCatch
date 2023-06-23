@@ -481,7 +481,6 @@ func inspectFunc1(fn *ssa.Function) {
 						Bugs = append(Bugs, ii)
 						bugMu.Unlock()
 					}
-
 				}
 			}
 		}
@@ -520,7 +519,7 @@ func Detect() {
 	util.GetStructPointerMapping()
 
 	mu := &sync.Mutex{}
-	util.ParallelIntraproceduralAnalysis("Missing Unlock", ssautil.AllFunctions(config.Prog), func (fn *ssa.Function) {
+	util.IntraproceduralAnalysis("Missing Unlock", ssautil.AllFunctions(config.Prog), func(fn *ssa.Function) {
 		mu.Lock()
 		if _, ok := AnalyzedFNs[fn.String()]; ok {
 			mu.Unlock()
