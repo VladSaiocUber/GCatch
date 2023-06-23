@@ -272,7 +272,6 @@ func BuildCallGraph() *callgraph.Graph {
 
 	fmt.Println("Building call graph with PTA...")
 	metrics := stamets.Analyze(cfg)
-	fmt.Println(metrics)
 	result, err := metrics.Unpack()
 
 	defer func() {
@@ -283,8 +282,9 @@ func BuildCallGraph() *callgraph.Graph {
 		fmt.Println("Error when building callgraph with nil Queries:\n", err.Error())
 		return nil
 	}
+	fmt.Println(metrics.String())
 	graphMetrics := stamets.GetCallGraphMetrics(result.CallGraph)
-	fmt.Println(graphMetrics)
+	fmt.Println(graphMetrics.String())
 
 	graph, _ := graphMetrics.Unpack()
 	fmt.Println("Call graph construction done")
