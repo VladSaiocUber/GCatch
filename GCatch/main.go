@@ -282,7 +282,7 @@ func BuildCallGraph() *callgraph.Graph {
 		fmt.Println("Error when building callgraph with nil Queries:\n", err.Error())
 		return nil
 	}
-	fmt.Println(metrics.String())
+	fmt.Println("CALL-GRAPH PTA METRICS:\n  - Duration:", metrics.Seconds())
 	graphMetrics := stamets.GetCallGraphMetrics(result.CallGraph)
 	fmt.Println(graphMetrics.String())
 

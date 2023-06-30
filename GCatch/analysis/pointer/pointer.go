@@ -70,7 +70,7 @@ func AnalyzeAllSyncOp() (*pointer.Result, []*instinfo.StOpValue) {
 
 	fmt.Println("Performing PTA for channel operations...")
 	metrics := stamets.Analyze(cfg)
-	fmt.Println(metrics)
+	fmt.Println(metrics.String())
 	stPtrResult, err := metrics.Unpack()
 	defer fmt.Println("PTA for channel operations done")
 
@@ -83,7 +83,7 @@ func AnalyzeAllSyncOp() (*pointer.Result, []*instinfo.StOpValue) {
 	config.CallGraph = stPtrResult.CallGraph
 	cgMetrics := stamets.GetCallGraphMetrics(config.CallGraph)
 	fmt.Println("PTA for channel ops call graph metrics")
-	fmt.Println(cgMetrics)
+	fmt.Println(cgMetrics.String())
 
 	config.Inst2CallSite = make(map[ssa.CallInstruction]map[*callgraph.Edge]bool)
 	for _, node := range config.CallGraph.Nodes {
