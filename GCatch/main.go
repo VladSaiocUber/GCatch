@@ -49,11 +49,11 @@ func main() {
 	pGoModulePath := flag.String("mod-module-path", "", "Beta functionality: The module path of the program you want to check, like google.golang.org/grpc")
 	pGoModAbsPath := flag.String("mod-abs-path", "", "Beta functionality: The absolute path of the program you want to check, which contains go.mod")
 
-	var ptaDuration int
-	flag.IntVar(&ptaDuration, "pta-timeout", 0, "Maximum duration allowed for the points-to analysis (in seconds). If unspecified, PTA may carry out indefinitely.")
-	config.MAX_PTA_DURATION = time.Duration(ptaDuration) * time.Second
+	var ptaDuration *int = new(int)
+	flag.IntVar(ptaDuration, "pta-timeout", 0, "Maximum duration allowed for the points-to analysis (in seconds). If unspecified, PTA may carry out indefinitely.")
 
 	flag.Parse()
+	config.MAX_PTA_DURATION = time.Duration(*ptaDuration) * time.Second
 
 	strProjectPath := *pProjectPath
 	strRelativePath := *pRelativePath
