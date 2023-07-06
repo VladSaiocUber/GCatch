@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -47,6 +48,10 @@ func main() {
 	pGoMod := flag.Bool("mod", false, "Beta functionality: Use this flag to indicate GCatch to build a program (and only it) by go.mod")
 	pGoModulePath := flag.String("mod-module-path", "", "Beta functionality: The module path of the program you want to check, like google.golang.org/grpc")
 	pGoModAbsPath := flag.String("mod-abs-path", "", "Beta functionality: The absolute path of the program you want to check, which contains go.mod")
+
+	var ptaDuration int
+	flag.IntVar(&ptaDuration, "pta-timeout", 0, "Maximum duration allowed for the points-to analysis (in seconds). If unspecified, PTA may carry out indefinitely.")
+	config.MAX_PTA_DURATION = time.Duration(ptaDuration) * time.Second
 
 	flag.Parse()
 
@@ -271,13 +276,20 @@ func BuildCallGraph() *callgraph.Graph {
 	}
 
 	fmt.Println("Building call graph with PTA...")
-	metrics := stamets.Analyze(cfg)
+	var timeout time.Duration
+	if config.MAX_PTA_DURATION > 0 {
+		timeout = config.MAX_PTA_DURATION
+	} else {
+		timeout = time.Duration(config.MAX_GCATCH_DDL_SECOND)
+	}
+
+	metrics, ok := stamets.AnalyzeWithTimeout(timeout, cfg)
+	if !ok {
+		log.Fatalf("PTA exceeded time limit: %s\n", timeout)
+	}
+
 	result, err := metrics.Unpack()
 
-	defer func() {
-		cfg = nil
-		result = nil
-	}()
 	if err != nil {
 		fmt.Println("Error when building callgraph with nil Queries:\n", err.Error())
 		return nil

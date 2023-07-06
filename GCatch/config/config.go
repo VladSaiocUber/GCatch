@@ -1,11 +1,16 @@
 package config
 
+import "time"
+
 // Dangerous thresholds: these thresholds prevents the checker or part of the checker from timeout
 //
 //	if these thresholds are reached, must print "!!!!" and a warning to the terminal
 var MAX_GCATCH_DDL_SECOND = 360000 // 100 h
 const MAX_LCA_LAYER = 7            // The maximum caller-callee layers when updating dependency map and finding LCA (Lowest Common Ancester)
 var MAX_GCATCH_FRAGMENT_ANALYSIS_TIME = 0
+
+// Points-to analysis timeout duration. 0 means no timeout.
+var MAX_PTA_DURATION time.Duration = 0
 
 const MAX_INST_IN_SYNCGRAPH = 10000
 const Max_PATH_ENUMERATE int = 1000000000

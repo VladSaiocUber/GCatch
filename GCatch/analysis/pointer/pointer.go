@@ -2,8 +2,10 @@ package pointer
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/system-pclub/GCatch/GCatch/config"
 	"github.com/system-pclub/GCatch/GCatch/instinfo"
@@ -69,7 +71,17 @@ func AnalyzeAllSyncOp() (*pointer.Result, []*instinfo.StOpValue) {
 	}
 
 	fmt.Println("Performing PTA for channel operations...")
-	metrics := stamets.Analyze(cfg)
+	var timeout time.Duration
+	if config.MAX_PTA_DURATION > 0 {
+		timeout = config.MAX_PTA_DURATION
+	} else {
+		timeout = time.Duration(config.MAX_GCATCH_DDL_SECOND)
+	}
+
+	metrics, ok := stamets.AnalyzeWithTimeout(timeout, cfg)
+	if !ok {
+		log.Fatalf("Channel PTA exceeded time limit: %s\n", timeout)
+	}
 	fmt.Println(metrics.String())
 	stPtrResult, err := metrics.Unpack()
 	defer fmt.Println("PTA for channel operations done")
